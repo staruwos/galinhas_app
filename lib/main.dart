@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,10 +75,75 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Map<String, int> _groupEggsByWeek(List<Map<String, dynamic>> data) {
+    Map<String, int> weekTotals = {};
+
+    for (var item in data) {
+      DateTime date = DateTime.parse(item['log_date']);
+      DateTime weekStart = date.subtract(Duration(days: date.weekday % 7));
+      String key = DateFormat('yyyy-MM-dd').format(weekStart);
+
+      int eggCount = item['egg_count'] is int
+          ? item['egg_count']
+          : int.tryParse(item['egg_count'].toString()) ?? 0;
+
+      weekTotals.update(key, (value) => value + eggCount,
+          ifAbsent: () => eggCount);
+    }
+
+    return weekTotals;
+  }
+
+  Widget _buildChart(Map<String, int> weeklyData) {
+    final sortedKeys = weeklyData.keys.toList()..sort();
+    final spots = sortedKeys.asMap().entries.map((entry) {
+      int index = entry.key;
+      String week = entry.value;
+      return FlSpot(
+        index.toDouble(),
+        weeklyData[week]!.toDouble(),
+      );
+    }).toList();
+
+    return SizedBox(
+      height: 200,
+      child: LineChart(
+        LineChartData(
+          titlesData: FlTitlesData(
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  int idx = value.toInt();
+                  if (idx < sortedKeys.length) {
+                    return Text(sortedKeys[idx].substring(5));
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          lineBarsData: [
+            LineChartBarData(
+              isCurved: true,
+              spots: spots,
+              barWidth: 4,
+              color: Colors.green,
+              dotData: FlDotData(show: true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final weeklyData = _groupEggsByWeek(_history);
+
     return Scaffold(
-      appBar: AppBar(title: Text('Chicken Tracker')),
+      appBar: AppBar(title: Text('Egg Tracker')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -103,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   TextFormField(
                     controller: _eggsController,
-                    decoration: InputDecoration(labelText: 'Ovos produzidos'),
+                    decoration: InputDecoration(labelText: 'Ovos'),
                     keyboardType: TextInputType.number,
                     validator: (value) => value!.isEmpty ? 'Requerido' : null,
                   ),
@@ -122,6 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Divider(height: 40),
+            if (weeklyData.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Ovos na Semana', style: Theme.of(context).textTheme.titleLarge),
+                  _buildChart(weeklyData),
+                  SizedBox(height: 20),
+                ],
+              ),
             Text('Histórico', style: Theme.of(context).textTheme.titleLarge),
             Expanded(
               child: ListView.builder(
