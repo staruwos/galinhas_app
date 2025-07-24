@@ -75,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // TEST
   Map<String, int> _groupEggsByWeek(List<Map<String, dynamic>> data) {
     Map<String, int> weekTotals = {};
 
